@@ -49,6 +49,7 @@ type GoGrpc struct {
 	Task   map[string]*GrpcTask
 }
 
+// NewGoGrpc return a GoGrpc Pointer
 func NewGoGrpc() *GoGrpc {
 	mu.Lock()
 	defer mu.Unlock()
@@ -61,13 +62,14 @@ func NewGoGrpc() *GoGrpc {
 	return &g
 }
 
-// SetTimeout reset timeout, replace default timeout with a special time duration
+// SetTimeout reset timeout, replace default timeout with a special time
 func (g *GoGrpc) SetTimeout(timeout time.Duration) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.time = timeout
 }
 
+// Run running all tasks separately in goroutine
 func (g *GoGrpc) Run() {
 	for _, task := range g.Task {
 		go g.run(task)
@@ -75,6 +77,7 @@ func (g *GoGrpc) Run() {
 	g.Wait()
 }
 
+// Wait blocks until the goroutine is stopped
 func (g *GoGrpc) Wait() {
 	defer g.cancel()
 	g.wait.Wait()

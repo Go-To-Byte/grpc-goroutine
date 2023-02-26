@@ -29,7 +29,7 @@ func Login(ctx context.Context, req *loginReq) (*loginResp, error) {
 		return nil, fmt.Errorf("登录失败")
 	}
 	fmt.Println("登录成功")
-	return &loginResp{UserId: 21, Token: "testgrpccallsuccess"}, nil
+	return &loginResp{UserId: 21, Token: "test grpc call success"}, nil
 }
 
 func TestGrpcTask(t *testing.T) {
@@ -38,9 +38,10 @@ func TestGrpcTask(t *testing.T) {
 	req := &loginReq{Username: "ciusyan", Password: "222"}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	resp, err := grpcrun.GrpcTask(Login, &ctx, req)
+	task := grpcrun.NewGrpc(&ctx, Login, req)
+	task.GrpcTask()
 
-	if should.NoError(err) {
-		t.Log(resp.(*loginResp))
+	if should.NoError(task.Err) {
+		t.Log(task.Response.(*loginResp))
 	}
 }

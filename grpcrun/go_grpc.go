@@ -15,12 +15,16 @@ import (
 
 var (
 	mu   sync.Mutex
+	log  *zap.Logger
 	node *snowflake.Node
 )
 
 func init() {
 	var err error
 	mu = sync.Mutex{}
+	log, _ = zap.NewDevelopment()
+	zap.ReplaceGlobals(log)
+	// zap.ReplaceGlobals(&log)
 	if node, err = snowflake.NewNode(int64(time.Now().Day())); err != nil {
 		panic(err)
 	}
@@ -37,38 +41,43 @@ func init() {
 //		run.Wait()
 //	}
 type GoGrpc struct {
-	mu      sync.Mutex
-	ctx     context.Context
-	cancel  context.CancelFunc
-	wait    sync.WaitGroup
-	Timeout time.Duration
-	Task    map[string]*GrpcTask
+	mu     sync.Mutex
+	ctx    context.Context
+	cancel context.CancelFunc
+	wait   sync.WaitGroup
+	time   time.Duration
+	Task   map[string]*GrpcTask
 }
 
+// NewGoGrpc return a GoGrpc Pointer
 func NewGoGrpc() *GoGrpc {
 	mu.Lock()
 	defer mu.Unlock()
 	g := GoGrpc{}
-	g.ctx, g.cancel = context.WithTimeout(context.Background(), 3*time.Second)
 	g.mu = sync.Mutex{}
+	g.time = 3 * time.Second
 	g.wait = sync.WaitGroup{}
 	g.Task = make(map[string]*GrpcTask, 0)
+	g.ctx, g.cancel = context.WithTimeout(context.Background(), g.time)
 	return &g
 }
 
-// SetTimeout reset timeout, replace default timeout with a special time duration
+// SetTimeout reset timeout, replace default timeout with a special time
 func (g *GoGrpc) SetTimeout(timeout time.Duration) {
-	mu.Lock()
-	mu.Unlock()
-	g.ctx, g.cancel = context.WithTimeout(context.Background(), timeout)
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.time = timeout
 }
 
+// Run running all tasks separately in goroutine
 func (g *GoGrpc) Run() {
-	for _, t := range g.Task {
-		go g.run(t)
+	for _, task := range g.Task {
+		go g.run(task)
 	}
+	g.Wait()
 }
 
+// Wait blocks until the goroutine is stopped
 func (g *GoGrpc) Wait() {
 	defer g.cancel()
 	g.wait.Wait()
@@ -84,16 +93,20 @@ func (g *GoGrpc) AddTask(task *GrpcTask) {
 func (g *GoGrpc) AddNewTask(grpcName string, grpcMethod any, request any) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	zap.S()
-	task := GrpcTask{
-		ctx:        &g.ctx,
+
+	if grpcName == "" {
+		grpcName = node.Generate().String()
+	}
+
+	task := &GrpcTask{
+		ctx:        g.ctx,
 		grpcMethod: grpcMethod,
 		request:    request,
 		Name:       grpcName,
-		log:        zap.S().Named(grpcName),
+		log:        zap.S(),
 	}
 
-	g.Task[node.Generate().String()] = &task
+	g.Task[task.Name] = task
 	g.wait.Add(1)
 	return
 }
@@ -103,10 +116,12 @@ func (g *GoGrpc) run(t *GrpcTask) {
 	for {
 		select {
 		case <-g.ctx.Done():
+			t.log.Info("context done")
 			t.Err = errors.New("context canceled")
 			return
 		default:
 			t.Call()
+			t.log.Info("success call function")
 			return
 		}
 	}

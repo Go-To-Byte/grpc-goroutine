@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"go.uber.org/zap"
+	"strconv"
 	"testing"
 	"time"
 
@@ -72,8 +73,8 @@ var (
 func TestGrpcTask(t *testing.T) {
 
 	for i, d := range datas {
-		call := grpcrun.NewGrpc(&d.ctx, d.method, d.req)
-		call.GrpcTask()
+		call := grpcrun.NewGrpcTask(&d.ctx, "test{"+strconv.Itoa(i)+"}", d.method, d.req)
+		call.Call()
 
 		t.Logf("第 %d 次执行\n", i+1)
 		if call.Err != nil {
@@ -81,9 +82,9 @@ func TestGrpcTask(t *testing.T) {
 			fmt.Println()
 			continue
 		}
-		//if should.NoError(call.Err) {
+		// if should.NoError(call.Err) {
 		//	fmt.Println(call.Response.(*loginResp))
-		//}
+		// }
 		fmt.Println(call.Response.(*loginResp))
 		fmt.Println()
 
@@ -107,17 +108,43 @@ func init() {
 
 	// 测试表格
 	datas = []*data{
-		newData(ctx, Login, req),     // 正常
-		newData(ctx, Login1, req),    // [grpcMethod]必须有2个参数(context.Context, *request)
-		newData(ctx, Login2, req),    // [grpcMethod]的第1个参数必须是：context.Context
-		newData(ctx, Login3, req),    // [grpcMethod]必须有2个返回值(*Response, error)
-		newData(ctx, Login4, req),    // [grpcMethod]的第2个返回值必须是：error
-		newData(nil, Login, req),     // 请正确的传递[Context]，不支持：nil
-		newData(ctx, nil, req),       // [grpcMethod]必须是一个GRPC的函数类型，现在是：invalid
-		newData(ctx, Login, nil),     // 请正确的传递[request]，不支持：invalid
-		newData(ctx, "其他类型", req),    // [grpcMethod]必须是一个GRPC的函数类型，现在是：string
-		newData(ctx, Login, "其他类型"),  // 请正确的传入[request]，不支持：string
-		newData(ctx, Login, zap.S()), // [request]的参数与[grpcMethod]的参数不匹配：grpcMethod = v3_test.loginReq, request = zap.SugaredLogger
+		newData(ctx, Login, req),        // 正常
+		newData(ctx, Login1, req),       // [grpcMethod]必须有2个参数(context.Context, *request)
+		newData(ctx, Login2, req),       // [grpcMethod]的第1个参数必须是：context.Context
+		newData(ctx, Login3, req),       // [grpcMethod]必须有2个返回值(*Response, error)
+		newData(ctx, Login4, req),       // [grpcMethod]的第2个返回值必须是：error
+		newData(nil, Login, req),        // 请正确的传递[Context]，不支持：nil
+		newData(ctx, nil, req),          // [grpcMethod]必须是一个GRPC的函数类型，现在是：invalid
+		newData(ctx, Login, nil),        // 请正确的传递[request]，不支持：invalid
+		newData(ctx, "其他类型", req),   // [grpcMethod]必须是一个GRPC的函数类型，现在是：string
+		newData(ctx, Login, "其他类型"), // 请正确的传入[request]，不支持：string
+		newData(ctx, Login, zap.S()),    // [request]的参数与[grpcMethod]的参数不匹配：grpcMethod = v3_test.loginReq, request = zap.SugaredLogger
 
+	}
+}
+
+func TestGoGrpc_AddNewTask(t *testing.T) {
+	run := grpcrun.NewGoGrpc()
+	for i, d := range datas {
+		run.AddNewTask("test{"+strconv.Itoa(i)+"}", d.method, d.req)
+	}
+}
+
+func TestGoGrpc_Run(t *testing.T) {
+	run := grpcrun.NewGoGrpc()
+	for i, d := range datas {
+		run.AddNewTask("test{"+strconv.Itoa(i)+"}", d.method, d.req)
+	}
+	run.Run()
+	run.Wait()
+
+	for _, t := range run.Task {
+		if t.Err != nil {
+			fmt.Println(t.Err)
+			fmt.Println()
+			continue
+		}
+		fmt.Println(t.Response.(*loginResp))
+		fmt.Println()
 	}
 }

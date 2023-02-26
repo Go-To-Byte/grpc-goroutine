@@ -41,7 +41,7 @@ func init() {
 //		run.Wait()
 //	}
 type GoGrpc struct {
-	// mu     sync.Mutex
+	mu     sync.Mutex
 	ctx    context.Context
 	cancel context.CancelFunc
 	wait   sync.WaitGroup
@@ -53,7 +53,7 @@ func NewGoGrpc() *GoGrpc {
 	mu.Lock()
 	defer mu.Unlock()
 	g := GoGrpc{}
-	// g.mu = sync.Mutex{}
+	g.mu = sync.Mutex{}
 	g.time = 3 * time.Second
 	g.wait = sync.WaitGroup{}
 	g.Task = make(map[string]*GrpcTask, 0)
@@ -63,8 +63,8 @@ func NewGoGrpc() *GoGrpc {
 
 // SetTimeout reset timeout, replace default timeout with a special time duration
 func (g *GoGrpc) SetTimeout(timeout time.Duration) {
-	mu.Lock()
-	defer mu.Unlock()
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	g.time = timeout
 }
 
@@ -81,15 +81,15 @@ func (g *GoGrpc) Wait() {
 }
 
 func (g *GoGrpc) AddTask(task *GrpcTask) {
-	// g.mu.Lock()
-	// defer g.mu.Unlock()
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	g.Task[task.Name] = task
 	g.wait.Add(1)
 }
 
 func (g *GoGrpc) AddNewTask(grpcName string, grpcMethod any, request any) {
-	// g.mu.Lock()
-	// defer g.mu.Unlock()
+	g.mu.Lock()
+	defer g.mu.Unlock()
 
 	if grpcName == "" {
 		grpcName = node.Generate().String()

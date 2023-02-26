@@ -69,13 +69,14 @@ func Login4(ctx context.Context, req *loginReq) (*loginResp, int) {
 
 func Login5(ctx context.Context, req *loginReq) (*loginResp, error) {
 	fmt.Println("sleep: ", req)
-	time.Sleep(4 * time.Second)
+	time.Sleep(time.Second)
 	fmt.Println("over: ", req)
 	return &loginResp{UserId: 2333, Token: "test grpc call success"}, nil
 }
 
 var (
-	datas []*data
+	datas    []*data
+	timeouts []*data
 )
 
 func TestGrpcTask(t *testing.T) {
@@ -130,6 +131,19 @@ func init() {
 		newData(ctx, Login, zap.S()), // [request]的参数与[grpcMethod]的参数不匹配：grpcMethod = v3_test.loginReq, request = zap.SugaredLogger
 
 	}
+
+	timeouts = []*data{
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
+	}
 }
 
 func TestGoGrpc_AddNewTask(t *testing.T) {
@@ -160,7 +174,7 @@ func TestGoGrpc_Run(t *testing.T) {
 
 func TestGoGrpc_Timeout(t *testing.T) {
 	run := grpcrun.NewGoGrpc()
-	for i, d := range datas {
+	for i, d := range timeouts {
 		run.AddNewTask("test{"+strconv.Itoa(i)+"}", d.method, d.req)
 	}
 

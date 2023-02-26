@@ -69,10 +69,8 @@ func (g *GoGrpc) SetTimeout(timeout time.Duration) {
 }
 
 func (g *GoGrpc) Run() {
-	for key, _ := range g.Task {
-		go func(k string) {
-			go g.run(g.Task[k])
-		}(key)
+	for _, task := range g.Task {
+		go g.run(task)
 	}
 	g.Wait()
 }

@@ -8,8 +8,8 @@ import (
 	"reflect"
 )
 
-// Grpc 用于构建Grpc请求
-type Grpc struct {
+// GrpcTask 用于构建Grpc Task
+type GrpcTask struct {
 	// 必须符合GRPC的 Method 签名
 	grpcMethod any
 
@@ -18,6 +18,7 @@ type Grpc struct {
 	request any
 
 	// GRPC的调用返回值
+	Name     string
 	Response any
 	Err      error
 
@@ -25,18 +26,30 @@ type Grpc struct {
 	log *zap.SugaredLogger
 }
 
-func NewGrpc(ctx *context.Context, grpcMethod any, req any) *Grpc {
+// NewGrpcTask creates a new GrpcTask
+//
+// Note:
+// @param grpcName string name of the grpc, this should be unique
+func NewGrpcTask(ctx *context.Context, grpcName string, grpcMethod any, request any) *GrpcTask {
+	mu.Lock()
+	defer mu.Unlock()
 	zap.S()
-	return &Grpc{
+
+	if grpcName == "" {
+		grpcName = node.Generate().String()
+	}
+
+	return &GrpcTask{
 		ctx:        ctx,
 		grpcMethod: grpcMethod,
-		request:    req,
-		log:        zap.S().Named("Grpc-Task"),
+		request:    request,
+		Name:       grpcName,
+		log:        zap.S().Named(grpcName),
 	}
 }
 
-// GrpcTask ：去调用GRPC的方法
-func (c *Grpc) GrpcTask() {
+// Call 去调用GRPC的方法
+func (c *GrpcTask) Call() {
 	// 进行参数校验
 	c.validate()
 	if c.Err != nil {
@@ -48,7 +61,7 @@ func (c *Grpc) GrpcTask() {
 	c.call()
 }
 
-func (c *Grpc) call() {
+func (c *GrpcTask) call() {
 	v := reflect.ValueOf(c.grpcMethod)
 
 	// 调用参数
@@ -67,7 +80,7 @@ func (c *Grpc) call() {
 }
 
 // 校验结构体
-func (c *Grpc) validate() {
+func (c *GrpcTask) validate() {
 
 	// 校验 req 类型
 	reqV := reflect.ValueOf(c.request)

@@ -14,7 +14,7 @@ type GrpcTask struct {
 	grpcMethod any
 
 	// GRPC的调用参数
-	ctx     *context.Context
+	ctx     context.Context
 	request any
 
 	// GRPC的调用返回值
@@ -30,10 +30,9 @@ type GrpcTask struct {
 //
 // Note:
 // @param grpcName string name of the grpc, this should be unique
-func NewGrpcTask(ctx *context.Context, grpcName string, grpcMethod any, request any) *GrpcTask {
+func NewGrpcTask(ctx context.Context, grpcName string, grpcMethod any, request any) *GrpcTask {
 	mu.Lock()
 	defer mu.Unlock()
-	zap.S()
 
 	if grpcName == "" {
 		grpcName = node.Generate().String()
@@ -66,7 +65,7 @@ func (c *GrpcTask) call() {
 
 	// 调用参数
 	argv := make([]reflect.Value, 2)
-	argv[0] = reflect.ValueOf(*c.ctx)
+	argv[0] = reflect.ValueOf(c.ctx)
 	argv[1] = reflect.ValueOf(c.request)
 
 	// 反射调用
@@ -90,7 +89,7 @@ func (c *GrpcTask) validate() {
 	}
 
 	// 校验 ctx 类型
-	ctxV := reflect.ValueOf(c.ctx).Elem()
+	ctxV := reflect.ValueOf(&c.ctx).Elem()
 	if ctxV.IsNil() {
 		c.Err = fmt.Errorf("请正确的传递[Context]，不支持：nil")
 		return

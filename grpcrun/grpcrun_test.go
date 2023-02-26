@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"go.uber.org/zap"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -66,14 +67,22 @@ func Login4(ctx context.Context, req *loginReq) (*loginResp, int) {
 	return &loginResp{UserId: 21, Token: "test grpc call success"}, 1
 }
 
+func Login5(ctx context.Context, req *loginReq) (*loginResp, error) {
+	fmt.Println("sleep: ", req)
+	time.Sleep(time.Second)
+	fmt.Println("over: ", req)
+	return &loginResp{UserId: 2333, Token: "test grpc call success"}, nil
+}
+
 var (
-	datas []*data
+	datas    []*data
+	timeouts []*data
 )
 
 func TestGrpcTask(t *testing.T) {
 
 	for i, d := range datas {
-		call := grpcrun.NewGrpcTask(&d.ctx, "test{"+strconv.Itoa(i)+"}", d.method, d.req)
+		call := grpcrun.NewGrpcTask(d.ctx, "test{"+strconv.Itoa(i)+"}", d.method, d.req)
 		call.Call()
 
 		t.Logf("第 %d 次执行\n", i+1)
@@ -108,18 +117,32 @@ func init() {
 
 	// 测试表格
 	datas = []*data{
-		newData(ctx, Login, req),        // 正常
-		newData(ctx, Login1, req),       // [grpcMethod]必须有2个参数(context.Context, *request)
-		newData(ctx, Login2, req),       // [grpcMethod]的第1个参数必须是：context.Context
-		newData(ctx, Login3, req),       // [grpcMethod]必须有2个返回值(*Response, error)
-		newData(ctx, Login4, req),       // [grpcMethod]的第2个返回值必须是：error
-		newData(nil, Login, req),        // 请正确的传递[Context]，不支持：nil
-		newData(ctx, nil, req),          // [grpcMethod]必须是一个GRPC的函数类型，现在是：invalid
-		newData(ctx, Login, nil),        // 请正确的传递[request]，不支持：invalid
-		newData(ctx, "其他类型", req),   // [grpcMethod]必须是一个GRPC的函数类型，现在是：string
-		newData(ctx, Login, "其他类型"), // 请正确的传入[request]，不支持：string
-		newData(ctx, Login, zap.S()),    // [request]的参数与[grpcMethod]的参数不匹配：grpcMethod = v3_test.loginReq, request = zap.SugaredLogger
+		newData(ctx, Login, req),     // 正常
+		newData(ctx, Login1, req),    // [grpcMethod]必须有2个参数(context.Context, *request)
+		newData(ctx, Login2, req),    // [grpcMethod]的第1个参数必须是：context.Context
+		newData(ctx, Login3, req),    // [grpcMethod]必须有2个返回值(*Response, error)
+		newData(ctx, Login4, req),    // [grpcMethod]的第2个返回值必须是：error
+		newData(ctx, Login5, req),    // [grpcMethod]的 timeout
+		newData(nil, Login, req),     // 请正确的传递[Context]，不支持：nil
+		newData(ctx, nil, req),       // [grpcMethod]必须是一个GRPC的函数类型，现在是：invalid
+		newData(ctx, Login, nil),     // 请正确的传递[request]，不支持：invalid
+		newData(ctx, "其他类型", req),    // [grpcMethod]必须是一个GRPC的函数类型，现在是：string
+		newData(ctx, Login, "其他类型"),  // 请正确的传入[request]，不支持：string
+		newData(ctx, Login, zap.S()), // [request]的参数与[grpcMethod]的参数不匹配：grpcMethod = v3_test.loginReq, request = zap.SugaredLogger
 
+	}
+
+	timeouts = []*data{
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
+		newData(ctx, Login5, req), // [grpcMethod]的 timeout
 	}
 }
 
@@ -147,4 +170,36 @@ func TestGoGrpc_Run(t *testing.T) {
 		fmt.Println(t.Response.(*loginResp))
 		fmt.Println()
 	}
+}
+
+func TestGoGrpc_Timeout(t *testing.T) {
+	run := grpcrun.NewGoGrpc()
+	for i, d := range timeouts {
+		run.AddNewTask("test{"+strconv.Itoa(i)+"}", d.method, d.req)
+	}
+
+	run.Run()
+
+	for k, t := range run.Task {
+		if t.Err != nil {
+			fmt.Println(k, t.Err.(error))
+		}
+	}
+	// fmt.Println(run.Task["test{5}"].Err.(error))
+}
+
+func TestGo(t *testing.T) {
+	type muNum struct {
+		mu  sync.Mutex
+		num int
+	}
+	n := muNum{num: 1}
+	for i := 1; i <= 10; i++ {
+		go func(num int) {
+			time.Sleep(time.Second)
+			n.num = num
+			fmt.Println(num)
+		}(i)
+	}
+	time.Sleep(2 * time.Second)
 }
